@@ -13,7 +13,7 @@ DATA_FILE = "Data/sofa_streamlit.xlsx"  # update path as needed
 
 @st.cache_data
 def load_data(path):
-    return pd.read_excel(path)
+    return pd.read_excel(path,engine='openpyxl')
 
 @st.cache_data
 def load_image(url):
