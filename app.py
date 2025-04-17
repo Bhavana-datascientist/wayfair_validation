@@ -9,7 +9,7 @@ st.set_page_config(layout="wide")
 st.title("🛠️ Wayfair Multi-Attribute Validation Tool")
 
 # ----------------- Load Data -----------------
-DATA_FILE = "D:/Validation_attribute_values/sofa_streamlit.xlsx"  # update path as needed
+DATA_FILE = "Data/sofa_streamlit.xlsx"  # update path as needed
 
 @st.cache_data
 def load_data(path):
@@ -135,7 +135,7 @@ if st.session_state.get("evaluation_complete"):
             if st.session_state.get(f"status_{idx}_{metrics_attr}", "Correct") == "Correct"
         )
         accuracy = correct / total
-        # precision and recall same in this binary context
+       
         precision = accuracy
         recall = accuracy
         c1, c2, c3 = st.columns(3)
