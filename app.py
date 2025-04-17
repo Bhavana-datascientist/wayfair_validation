@@ -80,7 +80,7 @@ for i in range(0, len(page_df), cols_per_row):
             with cols[j]:
                 img = load_image(row['Image URL'])
                 if img:
-                    st.image(img, use_column_width=True)
+                    st.image(img, use_container_width=True)
                 else:
                     st.write("No image available")
                 st.markdown(f"**SLNO:** {row['SLNO']}")
