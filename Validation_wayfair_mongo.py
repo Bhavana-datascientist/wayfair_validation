@@ -13,14 +13,50 @@ st.title("🛠️ Wayfair Multi-Attribute Validation Tool")
 # ----------------- MongoDB Connection -----------------
 client = MongoClient("mongodb+srv://bhavana:Trends_bhavana@wayfair.xve1u.mongodb.net/console?retryWrites=true&w=majority")
 db = client['console']
-collection = db['Attributes_Validation']
+
+# ----------------- Category Selection -----------------
+st.sidebar.header("📂 Select Category")
+categories = ['sofa', 'coffee_table', 'accent_chair']
+selected_category = st.sidebar.selectbox("Category", categories)
+
+# Save selected category to session to trigger re-run on change
+if "selected_category" not in st.session_state:
+    st.session_state.selected_category = selected_category
+
+if st.session_state.selected_category != selected_category:
+    st.session_state.selected_category = selected_category
+    st.experimental_rerun()
+
+# Dynamically load MongoDB collection and taxonomy collection
+data_collection = db[f'Attributes_Validation_{selected_category}']
+taxonomy_collection = db[f'{selected_category}_taxonomy']
 
 # ----------------- Load Data -----------------
 @st.cache_data
-def load_data():
-    data = list(collection.find())
+def load_data(_collection):
+    data = list(_collection.find())
     return pd.DataFrame(data)
 
+_df = load_data(data_collection)
+sample_df = _df.sample(frac=0.1, random_state=42).reset_index(drop=True)
+
+# Detect attribute columns
+attr_cols = [c for c in sample_df.columns if c not in ['_id', 'SLNO', 'Image URL']]
+
+# ----------------- Load Taxonomy -----------------
+@st.cache_data
+def load_taxonomy(_taxonomy_collection):
+    doc = _taxonomy_collection.find_one()
+    if doc:
+        doc.pop('_id', None)
+        return doc
+    else:
+        st.warning("⚠️ No taxonomy found for this category.")
+        return {}
+
+taxonomy = load_taxonomy(taxonomy_collection)
+
+# ----------------- Image Loader -----------------
 @st.cache_data
 def load_image(url):
     try:
@@ -31,33 +67,12 @@ def load_image(url):
         pass
     return None
 
-_df = load_data()
-sample_df = _df.sample(frac=0.1, random_state=42).reset_index(drop=True)
-
-attr_cols = [c for c in sample_df.columns if c not in ['_id', 'SLNO', 'Image URL']]
-
-taxonomy = {
-    'Product Type': ['Sofa'],
-    'Sub Type': ['Loveseat', 'Sectional', 'Sleeper', 'Standard', 'Modular', 'Chaise'],
-    'Silhouette': ['Straight', 'Curved', 'L-shaped', 'U-shaped', 'Tuxedo', 'Camelback', 'Lawson',
-                   'English roll arm', 'Chesterfield', 'Mid-century', 'Cabriole'],
-    'Back Style': ['Tight', 'Pillow', 'Tufted', 'Channel', 'Split', 'Camelback', 'Low profile',
-                   'High profile', 'Multi-cushion', 'Single-cushion'],
-    'Upholstery Color': ["Off-White", "Ivory", "Cream", "Beige", "Taupe", "Light Gray", "Dark Gray", "Charcoal", "Black", "White"],
-    'Upholstery Color_Hex': ['#FF0000', '#0000FF', '#00FF00', '#FFFF00'],
-    'Pattern': ['Solid', 'Striped', 'Floral', 'Geometric', 'Checkered/Plaid', 'Abstract', 'Animal print', 'Dot', 'Herringbone', 'Ikat', 'Damask', 'Trellis'],
-    'Sheen': ['Matte', 'Satin', 'Semi-gloss', 'High-gloss', 'Low-sheen', 'Reflective', 'Dull'],
-    'Finish': ['Natural', 'Painted', 'Distressed', 'Polished', 'Lacquered', 'Antique', 'Chrome', 'Brass'],
-    'Leg Visibility': ['Exposed', 'Hidden', 'No legs'],
-    'Visual Weight': ['Light', 'Medium', 'Heavy']
-}
-
 # ----------------- Session State Initialization -----------------
 if "page" not in st.session_state:
     st.session_state.page = 0
 
 if "feedback" not in st.session_state:
-    st.session_state.feedback = {}  # Store correctness + selected value per attribute
+    st.session_state.feedback = {}
 
 # ----------------- Pagination -----------------
 per_page = 20
@@ -90,7 +105,6 @@ for i in range(0, len(page_df), cols_per_row):
                     key_status = f"{idx}_{attr}_status"
                     key_newval = f"{idx}_{attr}_newval"
 
-                    # Restore values from session or set default
                     default_status = st.session_state.feedback.get(key_status, "Correct")
                     status = st.radio(
                         f"{attr}: {row[attr]}",
@@ -118,7 +132,7 @@ if st.button("💾 Save Updates"):
     for idx in range(start, end):
         row = sample_df.iloc[idx]
         obj_id = ObjectId(row['_id']) if not isinstance(row['_id'], ObjectId) else row['_id']
-        doc = collection.find_one({'_id': obj_id})
+        doc = data_collection.find_one({'_id': obj_id})
         if not doc:
             continue
         updates = {}
@@ -130,7 +144,7 @@ if st.button("💾 Save Updates"):
                 if new_val and new_val != doc.get(attr):
                     updates[attr] = new_val
         if updates:
-            result = collection.update_one({'_id': obj_id}, {'$set': updates})
+            result = data_collection.update_one({'_id': obj_id}, {'$set': updates})
             if result.modified_count > 0:
                 st.success(f"✅ Updated: {row['SLNO']} | Fields: {list(updates.keys())}")
                 updated_count += 1
