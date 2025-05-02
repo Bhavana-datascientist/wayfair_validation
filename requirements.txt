@@ -3,5 +3,5 @@ streamlit
 pandas
 pymongo
 requests
-Pillow
+pillow
 scikit-learn
