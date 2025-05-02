@@ -1,7 +1,7 @@
 python==3.7.5
 streamlit
 pandas
-openpyxl
+pymongo
 requests
 Pillow
 scikit-learn
